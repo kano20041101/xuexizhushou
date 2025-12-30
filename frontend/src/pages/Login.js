@@ -1,39 +1,51 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import './Login.css';
 
-const Login = () => {
+function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    if (!username || !password) {
+      setError('用户名和密码不能为空');
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await axios.post('http://localhost:8000/login', {
         username,
         password
       });
-      // 直接根据后端响应判断登录成功，移除status字段检查
-      navigate('/');
-    } catch (err) {
-      if (err.response && err.response.data && err.response.data.detail) {
-        setError(err.response.data.detail);
+
+      if (response.data.user_id) {
+        localStorage.setItem('userId', response.data.user_id);
+        navigate('/profile');
       } else {
-        setError('登录失败，请检查网络或服务器');
+        setError('登录失败，请重试');
       }
-      console.error('Login error:', err);
+    } catch (err) {
+      setError(err.response?.data?.detail || '登录失败，请检查用户名和密码');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="login-container">
       <div className="login-card">
-        <h2>用户登录</h2>
-        {error && <div className="error-message">{error}</div>}
-        <form onSubmit={handleSubmit}>
+        <h2>登录</h2>
+        <form onSubmit={handleSubmit} className="login-form">
+          {error && <div className="error-message">{error}</div>}
           <div className="form-group">
             <label htmlFor="username">用户名</label>
             <input
@@ -41,7 +53,7 @@ const Login = () => {
               id="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              required
+              disabled={loading}
             />
           </div>
           <div className="form-group">
@@ -51,17 +63,21 @@ const Login = () => {
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required
+              disabled={loading}
             />
           </div>
-          <button type="submit" className="login-button">登录</button>
+          <div className="button-group">
+            <button type="submit" disabled={loading} className="login-button">
+              {loading ? '登录中...' : '登录'}
+            </button>
+            <button type="button" onClick={() => navigate('/register')} className="register-button">
+              注册
+            </button>
+          </div>
         </form>
-        <div className="register-link">
-          还没有账号? <Link to="/register">立即注册</Link>
-        </div>
       </div>
     </div>
   );
-};
+}
 
 export default Login;
