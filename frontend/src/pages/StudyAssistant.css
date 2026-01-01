@@ -9,10 +9,59 @@
   color: #333;
   margin-bottom: 1.5rem;
   text-align: center;
+  font-size: 2.5rem;
 }
 
 .study-assistant-container p {
   color: #666;
   text-align: center;
   font-size: 1.1rem;
+  margin-bottom: 3rem;
+}
+
+.button-container {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+  margin-top: 3rem;
+}
+
+.feature-button {
+  padding: 1.5rem 3rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 200px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.feature-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.feature-button:active {
+  transform: translateY(0);
+}
+
+.knowledge-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.knowledge-button:hover {
+  background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
+}
+
+.analysis-button {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+}
+
+.analysis-button:hover {
+  background: linear-gradient(135deg, #e083eb 0%, #e5475c 100%);
 }

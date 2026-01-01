@@ -1,9 +1,16 @@
+import sys
+import os
+from pathlib import Path
+
+# 添加 backend 目录到 Python 路径
+backend_dir = Path(__file__).parent
+sys.path.insert(0, str(backend_dir))
+
 from fastapi import FastAPI, HTTPException, Depends, status, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, validator
 from typing import Optional, List
-import os
 import uuid
 from datetime import datetime
 from sqlalchemy import text
@@ -11,6 +18,7 @@ from pydantic import BaseModel
 from database.database import get_db, engine, Base
 from models.user_login import UserLogin
 from models.user_profile import UserProfile, GradeEnum
+from models.knowledge_point import KnowledgePoint
 from sqlalchemy import func
 from fastapi.staticfiles import StaticFiles
 
@@ -170,3 +178,163 @@ def update_profile(
     db.refresh(profile)
 
     return {"message": "个人信息更新成功"}
+
+# ==================== 知识点管理 API ====================
+
+class KnowledgePointCreate(BaseModel):
+    id: int
+    subject: str
+    point_name: str
+    category: str
+    importance: str = "中"
+    difficulty: str = "中"
+    exam_points: Optional[str] = None
+    content: Optional[str] = None
+
+class KnowledgePointUpdate(BaseModel):
+    subject: Optional[str] = None
+    point_name: Optional[str] = None
+    category: Optional[str] = None
+    importance: Optional[str] = None
+    difficulty: Optional[str] = None
+    exam_points: Optional[str] = None
+    content: Optional[str] = None
+
+# 获取用户的所有知识点
+@app.get("/knowledge-points/{user_id}")
+def get_knowledge_points(user_id: int, subject: Optional[str] = None, db: Session = Depends(get_db)):
+    # 验证用户是否存在
+    user = db.query(UserLogin).filter(UserLogin.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    # 查询知识点
+    query = db.query(KnowledgePoint).filter(KnowledgePoint.id == user_id)
+    if subject:
+        query = query.filter(KnowledgePoint.subject == subject)
+    
+    knowledge_points = query.order_by(KnowledgePoint.create_time.desc()).all()
+    
+    # 转换为字典列表
+    result = []
+    for kp in knowledge_points:
+        result.append({
+            "kp_id": kp.kp_id,
+            "id": kp.id,
+            "subject": kp.subject,
+            "point_name": kp.point_name,
+            "category": kp.category,
+            "importance": kp.importance,
+            "difficulty": kp.difficulty,
+            "exam_points": kp.exam_points,
+            "content": kp.content,
+            "create_time": kp.create_time.isoformat() if kp.create_time else None,
+            "update_time": kp.update_time.isoformat() if kp.update_time else None
+        })
+    
+    return result
+
+# 创建知识点
+@app.post("/knowledge-points")
+def create_knowledge_point(kp: KnowledgePointCreate, db: Session = Depends(get_db)):
+    # 验证用户是否存在
+    user = db.query(UserLogin).filter(UserLogin.id == kp.id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    # 检查知识点是否已存在
+    existing_kp = db.query(KnowledgePoint).filter(
+        KnowledgePoint.id == kp.id,
+        KnowledgePoint.point_name == kp.point_name
+    ).first()
+    
+    if existing_kp:
+        raise HTTPException(status_code=400, detail="该知识点已存在")
+    
+    # 创建新知识点
+    new_kp = KnowledgePoint(
+        id=kp.id,
+        subject=kp.subject,
+        point_name=kp.point_name,
+        category=kp.category,
+        importance=kp.importance,
+        difficulty=kp.difficulty,
+        exam_points=kp.exam_points,
+        content=kp.content,
+        create_time=datetime.now(),
+        update_time=datetime.now()
+    )
+    
+    db.add(new_kp)
+    db.commit()
+    db.refresh(new_kp)
+    
+    return {
+        "message": "知识点创建成功",
+        "kp_id": new_kp.kp_id
+    }
+
+# 更新知识点
+@app.put("/knowledge-points/{kp_id}")
+def update_knowledge_point(kp_id: int, kp_update: KnowledgePointUpdate, db: Session = Depends(get_db)):
+    # 查找知识点
+    kp = db.query(KnowledgePoint).filter(KnowledgePoint.kp_id == kp_id).first()
+    if not kp:
+        raise HTTPException(status_code=404, detail="知识点不存在")
+    
+    # 更新字段
+    if kp_update.subject is not None:
+        kp.subject = kp_update.subject
+    if kp_update.point_name is not None:
+        kp.point_name = kp_update.point_name
+    if kp_update.category is not None:
+        kp.category = kp_update.category
+    if kp_update.importance is not None:
+        kp.importance = kp_update.importance
+    if kp_update.difficulty is not None:
+        kp.difficulty = kp_update.difficulty
+    if kp_update.exam_points is not None:
+        kp.exam_points = kp_update.exam_points
+    if kp_update.content is not None:
+        kp.content = kp_update.content
+    
+    kp.update_time = datetime.now()
+    
+    db.commit()
+    db.refresh(kp)
+    
+    return {"message": "知识点更新成功"}
+
+# 删除知识点
+@app.delete("/knowledge-points/{kp_id}")
+def delete_knowledge_point(kp_id: int, db: Session = Depends(get_db)):
+    # 查找知识点
+    kp = db.query(KnowledgePoint).filter(KnowledgePoint.kp_id == kp_id).first()
+    if not kp:
+        raise HTTPException(status_code=404, detail="知识点不存在")
+    
+    db.delete(kp)
+    db.commit()
+    
+    return {"message": "知识点删除成功"}
+
+# 获取单个知识点详情
+@app.get("/knowledge-points/detail/{kp_id}")
+def get_knowledge_point_detail(kp_id: int, db: Session = Depends(get_db)):
+    kp = db.query(KnowledgePoint).filter(KnowledgePoint.kp_id == kp_id).first()
+    if not kp:
+        raise HTTPException(status_code=404, detail="知识点不存在")
+    
+    return {
+        "kp_id": kp.kp_id,
+        "id": kp.id,
+        "subject": kp.subject,
+        "point_name": kp.point_name,
+        "category": kp.category,
+        "importance": kp.importance,
+        "difficulty": kp.difficulty,
+        "exam_points": kp.exam_points,
+        "content": kp.content,
+        "create_time": kp.create_time.isoformat() if kp.create_time else None,
+        "update_time": kp.update_time.isoformat() if kp.update_time else None
+    }
